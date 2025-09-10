@@ -31,12 +31,13 @@ while True:
     message, clientAddress = serverSocket.recvfrom(1024) # 받을 때까지 블록킹.
     cnt += 1
     receivedData = message.decode()
+    print(receivedData)
 
     # 마지막 패킷
     if ',' not in receivedData:
         total_packets = int(receivedData)
 
-        if cnt != total_packets:
+        if cnt-1 != total_packets:
             print('# 저장실패 - 패킷 loss')
         elif total_packets > MAX_LEN:
             print('# 저장실패 - 최대 입력 초과')
@@ -49,23 +50,21 @@ while True:
             padded[:len(seq), :] = seq 
 
             # 레이블 열 추가
-            y = np.full((1,), CUR_LABLE_ID, dtype=np.int32)
+            y = np.full((MAX_LEN), CUR_LABLE_ID, dtype=np.int32)
+            padded = np.c_[padded, y]
             
             # 저장
             label = LABELS[CUR_LABLE_ID] 
-            filename = os.path.join(SAVE_DIR, f"record_{label}.npz")
+            filename = os.path.join(SAVE_DIR, f"record_{label}.npy")
 
             if os.path.exists(filename):
                 old = np.load(filename)
-                X_old, y_old = old["X"], old["y"]
-                X_new = np.concatenate([X_old, padded], axis=0)
-                y_new = np.concatenate([y_old, [CUR_LABLE_ID]], axis=0)
+                _new = np.concatenate([old, padded], axis=0)
             else:
-                X_new = padded
-                y_new = np.array([CUR_LABLE_ID], dtype=np.int32)
+                _new = padded
 
-            np.savez(filename, X=X_new, y=y_new)
-            print(f"# 저장성공 → {filename} (누적: {X_new.shape[0]}개)")
+            np.save(filename, _new)
+            print(f"# 저장성공 → {filename} (누적: {_new.shape[0]}개)")
             
         # 리스트 비우고, 다시 루프
         data = []
@@ -74,7 +73,7 @@ while True:
 
     # 리스트에 누적 
     else:
-        datas = receivedData.split(',')
+        datas = receivedData.replace('[', '').replace(']', '').split(',')
         if len(datas) == FEATURES_LEN:
             values = list(map(float, datas))
             data.append(values)
